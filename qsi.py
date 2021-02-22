@@ -8,10 +8,10 @@ Created on Sun Feb 21 12:12:41 2021
 
 import pennylane as qml
 import autograd.numpy as np
-from tqdm import tqdm
+from time import time
 import matplotlib.pyplot as plt
 
-dev = qml.device('default.qubit', wires=2)
+dev = qml.device('default.qubit', wires=2) # Define two-qubit circuit
 
 def noisy_CNot(noise):
     '''
@@ -25,7 +25,7 @@ def noisy_CNot(noise):
     qml.Rot(*noise[2],wires=0)
     qml.Rot(*noise[3],wires=1)
 
-def random_state_ansatz(state_params, noise=False, improve=False): #TODO: phase of qubit 0 for no noise seems to have a distribution, why?
+def random_state_ansatz(state_params, noise=None, improve=None): #TODO: Phase of qubit 0 for no noise seems to have a distribution, why? / For real quantum device, should use: arXiv:1608.00263
     '''
     Ansatz that generate random state with pre-randomized state_params. 
     state_params.shape = (8) range = [-np.pi, np.pi]
@@ -36,9 +36,9 @@ def random_state_ansatz(state_params, noise=False, improve=False): #TODO: phase 
     qml.RZ(state_params[1], wires=0)
     qml.RY(state_params[2], wires=1)
     qml.RZ(state_params[3], wires=1)
-    if type(noise) == bool:
+    if noise is None:
         qml.CNOT(wires=[0,1])
-    elif type(improve) == bool:
+    elif improve is None:
         noisy_CNot(noise)
     else:
         improving_CNot(improve, noise)
@@ -46,9 +46,9 @@ def random_state_ansatz(state_params, noise=False, improve=False): #TODO: phase 
     qml.RY(state_params[5], wires=1)
     qml.RZ(state_params[6], wires=0)
     qml.RZ(state_params[7], wires=1)
-    if type(noise) == bool:
+    if noise is None:
         qml.CNOT(wires=[0,1])
-    elif type(improve) == bool:
+    elif improve is None:
         noisy_CNot(noise)
     else:
         improving_CNot(improve, noise)
@@ -69,7 +69,7 @@ def improving_CNot(params, noise):
     qml.Rot(*params[4],wires=0)
     qml.Rot(*params[5],wires=1)
 
-def bias_test(noise=False):
+def bias_test(noise=None):
     '''
     Test if the distribution is biased for random state ansatz.
 
@@ -77,7 +77,7 @@ def bias_test(noise=False):
     
     sample_size = 10000
     state_params = np.random.uniform(low=-np.pi, high=np.pi, size=(sample_size, 8))
-    if type(noise) == bool:
+    if noise is None:
         @qml.qnode(dev)
         def random_state(state_params, noise):
             random_state_ansatz(state_params)
@@ -107,34 +107,35 @@ def bias_test(noise=False):
         axs[0,i].set_ylim([0,sample_size/3])
         axs[1,i].set_ylim([0,sample_size/15])
     
-def get_agi(params, noise, state_prep=True):
+def get_agi(params, noise, state_prep=True): #TODO: Can improve with arXiv:1104.4695 
     '''
     Calculate the Average Gate Infidelity.
     params, noise = params, noise in improving_CNot function
+    If params = None, Calculate AGI of noisy_CNot
+    
     state_prep: If true, do both random state preparation with real CNOT gates.
                 If False, do experimental state preparation with noisy_CNot.
                 If parmas-like: do experimental state preparation with improving_CNot.
 
     '''
-    if type(state_prep) == bool:
-        if state_prep == True:
-            @qml.qnode(dev)
-            def CNot_test(state_params):
+    @qml.qnode(dev)
+    def CNot_test(state_params): 
+        # Ramdom state preparation
+        if type(state_prep) == bool:
+            if state_prep == True: 
                 random_state_ansatz(state_params)
-                improving_CNot(params, noise)
-                return qml.state()
-        else:
-            @qml.qnode(dev)
-            def CNot_test(state_params):
+            else:
                 random_state_ansatz(state_params, noise=noise)
-                improving_CNot(params, noise)
-                return qml.state()
-    else:
-        @qml.qnode(dev)
-        def CNot_test(state_params):
+        else:
             random_state_ansatz(state_params, noise=noise, improve=state_prep)
+        
+        # Apply testing CNot
+        if params is None: 
+            noisy_CNot(noise)
+        else:
             improving_CNot(params, noise)
-            return qml.state()
+            
+        return qml.state()
     
     @qml.qnode(dev)
     def CNOT_true(state_params):
@@ -142,7 +143,7 @@ def get_agi(params, noise, state_prep=True):
         qml.CNOT(wires=[0,1])
         return qml.state()
     
-    sample_size = 10
+    sample_size = 100
     state_params = np.random.uniform(low=-np.pi, high=np.pi, size=(sample_size, 8))
     #fidelities = np.zeros(sample_size)
     fidelities = []
@@ -150,27 +151,31 @@ def get_agi(params, noise, state_prep=True):
         state_test = CNot_test(p)
         state_true = CNOT_true(p)
         fidelities.append(np.abs(np.dot(state_true.conj(),state_test))**2)
-    return 1-np.mean(np.array(fidelities))
+        
+    return 1 - np.mean(np.array(fidelities))
 
 def vqgo(prep_params, noise):
-    
+    '''
+    VQGO algorithm from arXiv:1810.12745. With state preparation params for QSI.
+
+    '''
     def cost_fn(params):
         return get_agi(params, noise, state_prep=prep_params)
     
     params = np.random.uniform(low=-np.pi, high=np.pi, size=(6,3))
-    max_iterations = 1000
-    conv_tol = 1e-6
+    max_iterations = 250
+    # conv_tol = 1e-6
     opt = qml.AdamOptimizer(stepsize=0.3)
     for n in range(max_iterations+1):
         params = opt.step(cost_fn, params)
         if n % 10 == 0:
             agi = cost_fn(params)
             print("VQGO: Iteration = {:}, AGI = {:.8f} ".format(n, agi))
-            if agi < conv_tol:
-                break
+            # if agi < conv_tol:
+            #     break
     return params
     
-#%% test randomness
+#%% Test random state preparation
 
 if __name__ == "__main__":
     noise = np.random.uniform(low=-np.pi/10, high=np.pi/10, size=(4,3))
@@ -182,22 +187,71 @@ if __name__ == "__main__":
 #%% VQGO (Assume perfect state preparation)
 
 if __name__ == "__main__":
-    noise = np.random.uniform(low=-np.pi/10, high=np.pi/10, size=(4,3))
+    noise = np.random.normal(loc=0.0, scale=0.01, size=(4,3))
     agi = vqgo(True, noise)
 
+#%% VQGO with Noisy preparation
 
+def vqgo_test(prep_params, noise):
+    '''
+    VQGO algorithm from arXiv:1810.12745. With state preparation params for QSI.
+
+    '''
+    def cost_fn(params):
+        return get_agi(params, noise, state_prep=prep_params)
+    
+    params = np.random.uniform(low=-np.pi, high=np.pi, size=(6,3))
+    max_iterations = 200
+    # conv_tol = 1e-6
+    opt = qml.AdamOptimizer(stepsize=0.3)
+    agi_list = []
+    agi_true_list = []
+    for n in range(max_iterations+1):
+        params = opt.step(cost_fn, params)
+        agi_list.append(cost_fn(params))
+        agi_true_list.append(get_agi(params,noise))
+        if n % 10 == 0:
+            agi = cost_fn(params)
+            print("VQGO: Iteration = {:}, AGI = {:.8f} ".format(n, agi))
+            # if agi < conv_tol:
+            #     break
+    return agi_list, agi_true_list, params
+
+if __name__ == "__main__":
+    noise = np.random.normal(loc=0.0, scale=0.1, size=(4,3))
+    agi_noise = get_agi(None, noise)
+    print("QSI: Iteration = {:}, AGI = {:.8f} ".format(0, agi_noise))
+    agi_list, agi_true_list, params = vqgo_test(False, noise)
+    agi_improved = get_agi(params, noise)
+    print("QSI: Iteration = {:}, AGI = {:.8f} ".format(1, agi_improved))
+    plt.plot(agi_list)
+    plt.plot(agi_true_list)
+    plt.yscale('log')
+    plt.axhline(y=agi_noise, color='r', linestyle='-')
+    plt.axhline(y=agi_improved, color='g', linestyle='-')
+    
 #%% QSI
 
 if __name__ == "__main__":
-    noise = np.random.uniform(low=-np.pi/1000, high=np.pi/1000, size=(4,3))
-    params = np.zeros((6,3))
-    it = 10
-    agi = np.zeros((it+1))
-    agi[0] = get_agi(params, noise)
+    noise = np.random.normal(loc=0.0, scale=0.13, size=(4,3))
+    iteration = 30
+    
+    agi = np.zeros((iteration+1))
+    agi[0] = get_agi(None, noise) #AGI of Noisy_CNot
     print("QSI: Iteration = {:}, AGI = {:.8f} ".format(0, agi[0]))
-    for i in range(10):
-        params = vqgo(params, noise)
-        agi[i+1] = get_agi(params, noise)
-        print("QSI: Iteration = {:}, AGI = {:.8f} ".format(i+1, agi[i+1]))
+    
+    # First Iteration: Use noisy_CNot to prepare
+    t = time()
+    prep_params = vqgo(False, noise)
+    agi[1] = get_agi(prep_params, noise)
+    print("QSI: Iteration = {:}, AGI = {:.8f}, Time = {:.0f} ".format(1, agi[1], time()-t))
+    
+    # Second Iteration and on: Use improved_CNot to prepare
+    for i in range(iteration-1):
+        prep_params = vqgo(prep_params, noise)
+        agi[i+2] = get_agi(prep_params, noise)
+        print("QSI: Iteration = {:}, AGI = {:.8f}, Time = {:.0f} ".format(i+2, agi[i+2], time()-t))
+    
+    plt.plot(agi)
     
         
