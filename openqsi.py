@@ -13,19 +13,6 @@ import matplotlib.pyplot as plt
 
 dev = qml.device('default.qubit', wires=2) # Define two-qubit circuit
 
-######## USING SANDBOX SIMULATOR ########
-
-# import remote_cirq
-
-# API_KEY = "AIzaSyAFny1gXO9IE35nXKmLVTxLMPZysawkrJ0"
-# sim = remote_cirq.RemoteSimulator(API_KEY)
-
-# dev = qml.device("cirq.simulator",
-#                   wires=2,
-#                   simulator=sim,
-#                   analytic=False)
-
-##########################################
 
 def noisy_CNot(noise):
     '''
@@ -213,7 +200,6 @@ def get_agi(params, noise, state_prep=True, alpha=0.0): #TODO: For real quantum 
             
         return qml.state()
     
-    
     sample_size = 100
     state_params = np.random.uniform(low=-np.pi, high=np.pi, size=(sample_size, 4, 3))
     fidelities = []
@@ -263,14 +249,35 @@ def vqgo(prep_params, noise, previous_params=None, get_history=False, alpha=0.0,
             if start_time is None:
                 print("VQGO: Iteration = {:}, Log(AGI) = {:.8f} ".format(n, agi_list[-1]))
             else:
-                print("VQGO: Iteration = {:}, AGI = {:.8f}, Exp_AGI = {:.8f}, Time = {:.0f} ".format(0, agi[0], agi_exp[0], time()-t))
+                print("VQGO: Iteration = {:}, Log(AGI) = {:.8f}, Time = {:.0f} ".format(n, agi_list[-1], time()-t))
     if get_history:
         return params_list[np.argmin(agi_list)], np.array(agi_true_list)
     else:
         return params_list[np.argmin(agi_list)]
     
-def plot_result(VQGO_AGI, QSI_AGI):
-    return 0
+def plot_result(vqgo_agi, qsi_agi, qsi_agi_exp=None, title=''):
+    if len(vqgo_agi.shape) == 1: # 1 iteration of VQGO
+        plt.plot(vqgo_agi, color='orange', label='VQGO')
+        plt.plot(0, qsi_agi[0],'*', markersize=10, color='red', label='Intitial')
+        plt.plot(len(vqgo_agi), qsi_agi[1], '*', markersize=10, color='green', label='Optimized')
+        if qsi_agi_exp is not None:
+            plt.plot(0, qsi_agi_exp[0],'*', markersize=10, color='orangered', label='Intitial (Measured)')
+            plt.plot(len(vqgo_agi), qsi_agi_exp[1], '*', markersize=10, color='springgreen', label='Optimized (Measured)')
+        plt.xlabel('VQGO iteration')
+        
+    elif len(vqgo_agi.shape) == 2: # multiple iterations of VQGO
+        x_vqgo = np.arange(0,len(qsi_agi)-1, 1/len(vqgo_agi[0]))
+        plt.plot(x_vqgo, vqgo_agi.flatten(), alpha=0.2, color='orange', label='VQGO')
+        plt.plot(0, qsi_agi[0],'*', markersize=10, color='red', label='Intitial', zorder=10)
+        plt.plot(qsi_agi, '*-', markersize=10,  color='green', label='QSI')
+        if qsi_agi_exp is not None:
+            plt.plot(0, qsi_agi_exp[0],'*', markersize=10, color='orangered', label='Intitial (Measured)', zorder=11)
+            plt.plot(qsi_agi_exp, '*-', markersize=10, color='springgreen', label='QSI (Measured)')
+        plt.xlabel('QSI iteration')
+        
+    plt.ylabel('AGI')
+    plt.yscale('log')
+    plt.legend()
     
 #%% Test random state preparation 
 
@@ -291,46 +298,53 @@ if __name__ == "__main__":
 #%% VQGO with Noisy preparation (One iteration of QSI)
 
 if __name__ == "__main__":
+    t = time()
     noise = np.random.normal(loc=0.0, scale=0.1, size=(4,3))
     agi_noise = get_agi(None, noise)
-    print("QSI: Iteration = {:}, AGI = {:.8f} ".format(0, agi_noise))
-    params, agi_true_list = vqgo(False, noise, get_history=True, alpha=0.9)
-    agi_improved = get_agi(params, noise)
-    print("QSI: Iteration = {:}, AGI = {:.8f} ".format(1, agi_improved))
-    plt.plot(agi_true_list)
-    plt.yscale('log')
-    plt.axhline(y=agi_noise, color='r', linestyle='-')
-    plt.axhline(y=agi_improved, color='g', linestyle='-')
+    print("Initial AGI = {:.8f} ".format(agi_noise))
     
-#%% QSI (Not tested)
+    params, vqgo_agi = vqgo(False, noise, get_history=True, alpha=0.9, start_time=t)
+    agi_improved = get_agi(params, noise)
+    print("Optimized AGI = {:.8f} ".format(agi_improved))
+    
+#%%
+    plot_result(vqgo_agi, (agi_noise, agi_improved))
+    
+#%% QSI
 
 if __name__ == "__main__":
     t = time()
     noise = np.random.normal(loc=0.0, scale=0.15, size=(4,3))
-    iteration = 3
+    iteration = 5
+    alpha = 0.1
     
     agi = np.zeros((iteration+1)) # True AGI
     agi_exp = np.zeros((iteration+1)) # Experimental AGI 
+    vqgo_agi_list = []
     
-    #AGIs of Noisy_CNot
+    #AGI of Noisy_CNot
     agi[0] = get_agi(None, noise) 
     agi_exp[0] = get_agi(None, noise, state_prep=False)
     print("QSI: Iteration = {:}, AGI = {:.8f}, Exp_AGI = {:.8f}, Time = {:.0f} ".format(0, agi[0], agi_exp[0], time()-t))
     
     # First Iteration: Use noisy_CNot to prepare
    
-    prep_params = vqgo(False, noise)
+    prep_params, vqgo_agi = vqgo(False, noise, get_history=True, alpha=alpha, start_time=t)
     agi[1] = get_agi(prep_params, noise)
     agi_exp[1] = get_agi(prep_params, noise, state_prep=prep_params) 
+    vqgo_agi_list.append(vqgo_agi)
     print("QSI: Iteration = {:}, True_AGI = {:.8f}, Exp_AGI = {:.8f}, Time = {:.0f} ".format(1, agi[1], agi_exp[1], time()-t))
     
     # Second Iteration and on: Use improved_CNot to prepare
     for i in range(iteration-1):
-        prep_params = vqgo(prep_params, noise, previous_params=prep_params)
+        prep_params, vqgo_agi  = vqgo(prep_params, noise, previous_params=prep_params, get_history=True, alpha=alpha, start_time=t)
         agi[i+2] = get_agi(prep_params, noise)
         agi_exp[i+2] = get_agi(prep_params, noise, state_prep=prep_params) 
+        vqgo_agi_list.append(vqgo_agi)
         print("QSI: Iteration = {:}, True_AGI = {:.8f}, Exp_AGI = {:.8f}, Time = {:.0f} ".format(i+2, agi[i+2], agi_exp[i+2], time()-t))
     
-    plt.plot(agi)
+    
+#%%
+    plot_result(np.array(vqgo_agi_list), agi, qsi_agi_exp=agi_exp)
     
         
