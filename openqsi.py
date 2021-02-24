@@ -267,12 +267,13 @@ def plot_result(vqgo_agi, qsi_agi, qsi_agi_exp=None, title=''):
         
     elif len(vqgo_agi.shape) == 2: # multiple iterations of VQGO
         x_vqgo = np.arange(0,len(qsi_agi)-1, 1/len(vqgo_agi[0]))
-        plt.plot(x_vqgo, vqgo_agi.flatten(), alpha=0.2, color='orange', label='VQGO')
+        plt.plot(x_vqgo, vqgo_agi.flatten(), alpha=0.5, color='orange', label='VQGO')
         plt.plot(0, qsi_agi[0],'*', markersize=10, color='red', label='Intitial', zorder=10)
         plt.plot(qsi_agi, '*-', markersize=10,  color='green', label='QSI')
         if qsi_agi_exp is not None:
-            plt.plot(0, qsi_agi_exp[0],'*', markersize=10, color='orangered', label='Intitial (Measured)', zorder=11)
-            plt.plot(qsi_agi_exp, '*-', markersize=10, color='springgreen', label='QSI (Measured)')
+            plt.plot(0, qsi_agi_exp[0],'*', markersize=10, color='red', alpha=0.5, label='Intitial (Measured)', zorder=11)
+            plt.plot(np.arange(0,2), qsi_agi_exp[:2], '-', markersize=10, color='green', alpha=0.5)
+            plt.plot(np.arange(1,len(qsi_agi_exp)), qsi_agi_exp[1:], '*-', markersize=10, color='green', alpha=0.5, label='QSI (Measured)')
         plt.xlabel('QSI iteration')
         
     plt.ylabel('AGI')
@@ -307,7 +308,6 @@ if __name__ == "__main__":
     agi_improved = get_agi(params, noise)
     print("Optimized AGI = {:.8f} ".format(agi_improved))
     
-#%%
     plot_result(vqgo_agi, (agi_noise, agi_improved))
     
 #%% QSI
@@ -343,8 +343,6 @@ if __name__ == "__main__":
         vqgo_agi_list.append(vqgo_agi)
         print("QSI: Iteration = {:}, True_AGI = {:.8f}, Exp_AGI = {:.8f}, Time = {:.0f} ".format(i+2, agi[i+2], agi_exp[i+2], time()-t))
     
-    
-#%%
     plot_result(np.array(vqgo_agi_list), agi, qsi_agi_exp=agi_exp)
     
-        
+#%% 
