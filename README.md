@@ -1,5 +1,5 @@
-# Quantum-Self-Improvement
-Quantum Self-Improvement Algorithm source code for QHack Open Hackathon 2021
+# Improved Variational Quantum Gate Optimization
+Improved Variational Quantum Gate Optimization Algorithm source code for QHack Open Hackathon 2021
 
 In this repo, we implement the Variational Quantum Gate Optimization (VQGO) algorithm described in [[1]](#1). In addition, we improved VQGO and make it implmentable to a noisy quantum computer (NQC).
 
@@ -25,7 +25,7 @@ We found with pennylane, we can easily implement VQGO.
 ## Problem with VQGO
 The problem of VQGO is in step 2, it is impoosible to random state sample without fiducial multi qubit gate. To show that, we introduce ansatz <em>A(U, ϕ)</em>, s.t. if <em>ϕ</em> is a random sample in real space, then <em>|i> = A(U<sub>T</sub>, ϕ)|0></em> is also a random sample to Haar measure, with fiducial state <em>|0></em>. We show that if change step 2 to:
 
-2'. Prepare a ramdom sample <em>A(U<sub>S</sub>, ϕ)|0></em>, operate <em>U(U<sub>S</sub>, **θ**)</em>,
+2'. Prepare a ramdom sample <em>A(U<sub>S</sub>, ϕ)|0></em;
 
 then the VQGO hits noise floor after few iterations.
 <p align="center">
@@ -37,7 +37,7 @@ then the VQGO hits noise floor after few iterations.
 Here we provide our solution to the problem above, The improved VQGO describes as below:
 1. Start with random intitial parameter <em>**θ**</em>;
 2. Prepare a sample <em>A(U<sub>S</sub>, ϕ)|0></em> with random <em>ϕ</em>, make a state estimation with few shots <em>|est> ≃ A(U<sub>S</sub>, ϕ)|0> + 𝛿|dψ></em>;
-3. Update simulated ramdom sample to <em>|sim> = (1-α)<sup>1/2</sup>A(U<sub>T</sub>, ϕ)|0> + α<sup>1/2</sup>|est></em>;
+3. Simulate the reference state with estimation: <em>|sim> = (1-α)<sup>1/2</sup>A(U<sub>T</sub>, ϕ)|0> + α<sup>1/2</sup>|est></em>;
 4. Measure fidelity <em>F(ϕ, **θ**) = |<0|A<sup>†</sup>(U<sub>S</sub>, ϕ)U<sup>†</sup>(U<sub>S</sub>, **θ**) U<sub>T</sub>|sim>|<sup>2</sup></em>;
 5. Do step 2-4 with <em>N</em> random samples  <em>{ϕ}</em>, calculate <em>AGI(**θ**) = 1 - [Σ<sub>{ϕ}</sub> F(ϕ, **θ**)]/N </em>;
 6. Optimize <em>**θ**</em> with cost function <em>AGI(**θ**)</em>;
