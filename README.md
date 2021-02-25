@@ -5,8 +5,6 @@ In this repo, we implement the Variational Quantum Gate Optimization (VQGO) algo
 
 The task of VQGO is to optimize a variational quantum gate with source gate <em>U<sub>S</sub></em> and paramters <em>**θ**</em>, with cost function <em>||U(U<sub>S</sub>, **θ**) - U<sub>T</sub>||</em>, where <em>U<sub>T</sub></em> is target gate that is previously unachievable with experiment, and <em>U<sub>S</sub></em> is the best experimental proxy of <em>U<sub>T</sub></em>. Practically, <em>U</em> is usually a multi qubit gate.
 
----
-## VQGO
 The original VQGO describes as below:
 1. Start with random intitial parameter <em>**θ**</em>;
 2. Prepare a ramdom sample <em>|i></em>;
@@ -22,10 +20,10 @@ We found with pennylane, we can easily implement VQGO.
 </p>
 
 ---
-## Problem with VQGO
+### Problem with VQGO
 The problem of VQGO is in step 2, it is impoosible to random state sample without fiducial multi qubit gate. To show that, we introduce ansatz <em>A(U, ϕ)</em>, s.t. if <em>ϕ</em> is a random sample in real space, then <em>|i> = A(U<sub>T</sub>, ϕ)|0></em> is also a random sample to Haar measure, with fiducial state <em>|0></em>. We show that if change step 2 to:
 
-2'. Prepare a ramdom sample <em>A(U<sub>S</sub>, ϕ)|0></em;
+2'. Prepare a ramdom sample <em>A(U<sub>S</sub>, ϕ)|0></em>;
 
 then the VQGO hits noise floor after few iterations.
 <p align="center">
@@ -33,7 +31,7 @@ then the VQGO hits noise floor after few iterations.
 </p>
 
 ---
-## Our improvement to VQGO
+### Our improvement to VQGO
 Here we provide our solution to the problem above, The improved VQGO describes as below:
 1. Start with random intitial parameter <em>**θ**</em>;
 2. Prepare a sample <em>A(U<sub>S</sub>, ϕ)|0></em> with random <em>ϕ</em>, make a state estimation with few shots <em>|est> ≃ A(U<sub>S</sub>, ϕ)|0> + 𝛿|dψ></em>;
@@ -54,7 +52,7 @@ where <em>𝛿|dψ></em> describes the uncertainty of the estimation, and paramt
 
 <em>Test_AGI[U(U<sub>S</sub>, **θ**')] < Test_AGI[U<sub>S</sub>]</em>,
 
-where <em>Test_AGI[U] = 1-[Σ<sub>{ϕ}</sub>|<0|A<sup>†</sup>(U, ϕ)U<sup>†</sup> U<sub>T</sub>|sim>|<sup>2</sup>]/N}</em>
+where <em>Test_AGI[U] = 1-[Σ<sub>{ϕ}</sub>|<0|A<sup>†</sup>(U, ϕ)U<sup>†</sup> U<sub>T</sub>A(U<sub>T</sub>, ϕ)|0>|<sup>2</sup>]/N}</em>
 
 ## References
 <a id="1">[1]</a>
