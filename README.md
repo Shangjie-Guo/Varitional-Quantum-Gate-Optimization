@@ -1,5 +1,4 @@
 # Improved Variational Quantum Gate Optimization
-Improved Variational Quantum Gate Optimization Algorithm source code for QHack Open Hackathon 2021
 
 In this repo, we implement the Variational Quantum Gate Optimization (VQGO) algorithm described in [[1]](#1). In addition, we improved VQGO and make it implementable to a noisy quantum computer (NQC).
 
